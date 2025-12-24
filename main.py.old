@@ -1,0 +1,314 @@
+"""
+FastAPI 后端 - 工厂内衣官网 B2B 展示系统
+使用 SQLAlchemy (Async) + SQLAdmin + MySQL
+"""
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.responses import HTMLResponse
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import String, Text, Integer, Boolean, ForeignKey, JSON
+from sqladmin import Admin, ModelView
+from sqladmin.authentication import AuthenticationBackend
+from starlette.requests import Request
+from starlette.responses import RedirectResponse
+from starlette.middleware.sessions import SessionMiddleware
+from typing import Optional, List
+from pydantic import BaseModel
+import os
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
+
+# ==================== 数据库配置 ====================
+DATABASE_URL = (
+    f"mysql+aiomysql://{os.getenv('DB_USER', 'root')}:{os.getenv('DB_PASSWORD', 'suantian51')}"
+    f"@{os.getenv('DB_HOST', '127.0.0.1')}:{os.getenv('DB_PORT', '3306')}"
+    f"/{os.getenv('DB_NAME', 'SCAVI')}?charset=utf8mb4"
+)
+
+engine = create_async_engine(DATABASE_URL, echo=True)
+async_session_maker = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+# ==================== SQLAlchemy Base ====================
+class Base(DeclarativeBase):
+    pass
+
+# ==================== Models ====================
+class Category(Base):
+    """产品分类 - 维度表（单级分类，极简版）"""
+    __tablename__ = "categories"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, comment="分类名称")
+    slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, comment="URL 标识")
+    order: Mapped[int] = mapped_column(Integer, default=0, comment="排序权重")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否启用")
+    
+    # 关联关系
+    products: Mapped[List["Product"]] = relationship("Product", back_populates="category")
+
+    def __repr__(self):
+        return f"<Category(id={self.id}, name='{self.name}')>"
+
+
+class Product(Base):
+    """产品 - B2B 展示"""
+    __tablename__ = "products"
+    
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    category_id: Mapped[Optional[int]] = mapped_column(ForeignKey("categories.id"), nullable=True, comment="分类ID")
+    name: Mapped[str] = mapped_column(String(200), nullable=False, comment="产品名称")
+    slug: Mapped[Optional[str]] = mapped_column(String(200), unique=True, nullable=True, comment="URL 标识")
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="产品简介")
+    key_features: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="核心卖点（每行一个）")
+    # 使用 JSON 字段存储图片列表和规格参数（简化设计）
+    images: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True, comment="图片URL列表")
+    specs: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True, comment="规格参数（颜色、尺码、材质等）")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, comment="是否展示")
+    created_at: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="创建时间")
+    updated_at: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, comment="更新时间")
+    
+    # 关联关系
+    category: Mapped[Optional["Category"]] = relationship("Category", back_populates="products")
+
+    def __repr__(self):
+        return f"<Product(id={self.id}, name='{self.name}')>"
+
+
+# ==================== SQLAdmin 认证 ====================
+class AdminAuth(AuthenticationBackend):
+    """简单的认证后端（使用环境变量中的用户名密码）"""
+    async def login(self, request: Request) -> bool:
+        form = await request.form()
+        username = form.get("username")
+        password = form.get("password")
+        
+        # 简单的认证逻辑（生产环境应使用更安全的方式）
+        if username == os.getenv("ADMIN_USERNAME", "SCAVI") and password == os.getenv("ADMIN_PASSWORD", "SCAVI123"):
+            request.session.update({"authenticated": True})
+            return True
+        return False
+
+    async def logout(self, request: Request) -> bool:
+        request.session.clear()
+        return True
+
+    async def authenticate(self, request: Request) -> bool:
+        return request.session.get("authenticated", False)
+
+
+# ==================== SQLAdmin Views ====================
+class CategoryAdmin(ModelView, model=Category):
+    """分类管理"""
+    name = "分类"
+    name_plural = "分类管理"
+    icon = "fa-folder"
+    
+    column_list = [Category.id, Category.name, Category.slug, Category.order, Category.is_active]
+    column_searchable_list = [Category.name]
+    column_sortable_list = [Category.id, Category.name, Category.order]
+    column_default_sort = ("order", True)
+    form_columns = [Category.name, Category.slug, Category.order, Category.is_active]
+
+
+class ProductAdmin(ModelView, model=Product):
+    """产品管理"""
+    name = "产品"
+    name_plural = "产品管理"
+    icon = "fa-box"
+    
+    column_list = [Product.id, Product.name, Product.category, Product.is_active, Product.created_at]
+    column_searchable_list = [Product.name, Product.description]
+    column_sortable_list = [Product.id, Product.name, Product.created_at]
+    column_default_sort = ("id", False)
+    form_columns = [
+        Product.name,
+        Product.slug,
+        Product.category,
+        Product.description,
+        Product.key_features,
+        Product.images,
+        Product.specs,
+        Product.is_active
+    ]
+
+
+# ==================== FastAPI App ====================
+app = FastAPI(
+    title="SCAVI 工厂内衣官网 API",
+    description="B2B 产品展示系统",
+    version="1.0.0"
+)
+
+# 添加 Session 中间件（SQLAdmin 认证需要）
+app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY", "your-secret-key-here"))
+
+# ==================== SQLAdmin 配置 ====================
+authentication_backend = AdminAuth(secret_key=os.getenv("SECRET_KEY", "your-secret-key-here"))
+admin = Admin(app, engine, authentication_backend=authentication_backend)
+admin.add_view(CategoryAdmin)
+admin.add_view(ProductAdmin)
+
+# ==================== 数据库依赖 ====================
+async def get_db():
+    """获取数据库会话"""
+    async with async_session_maker() as session:
+        yield session
+
+# ==================== Pydantic Schemas ====================
+class CategoryResponse(BaseModel):
+    id: int
+    name: str
+    slug: str
+    order: int
+    is_active: bool
+    
+    class Config:
+        from_attributes = True
+
+
+class ProductResponse(BaseModel):
+    id: int
+    name: str
+    slug: Optional[str]
+    description: Optional[str]
+    key_features: Optional[str]
+    images: Optional[List[str]]
+    specs: Optional[dict]
+    is_active: bool
+    category_id: Optional[int]
+    category: Optional[CategoryResponse] = None
+    
+    class Config:
+        from_attributes = True
+
+
+# ==================== API 路由 ====================
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    """首页"""
+    return """
+    <!DOCTYPE html>
+    <html lang="zh-CN">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>SCAVI 工厂内衣官网 API</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            }
+            .container {
+                background: white;
+                border-radius: 16px;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                padding: 40px;
+                max-width: 600px;
+                width: 100%;
+                text-align: center;
+            }
+            h1 { color: #333; margin-bottom: 10px; font-size: 32px; }
+            .subtitle { color: #666; margin-bottom: 40px; font-size: 16px; }
+            .links { display: flex; flex-direction: column; gap: 16px; }
+            .link {
+                display: block;
+                padding: 16px 24px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                text-decoration: none;
+                border-radius: 8px;
+                font-size: 18px;
+                font-weight: 500;
+                transition: transform 0.2s, box-shadow 0.2s;
+            }
+            .link:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+            }
+            .link.secondary {
+                background: #f5f5f5;
+                color: #333;
+            }
+            .link.secondary:hover {
+                background: #e8e8e8;
+                box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🚀 SCAVI API</h1>
+            <p class="subtitle">FastAPI + SQLAdmin 后端系统</p>
+            <div class="links">
+                <a href="/admin" class="link">进入管理后台</a>
+                <a href="/docs" class="link secondary">查看 API 文档</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+
+@app.get("/api/categories", response_model=List[CategoryResponse])
+async def get_categories(db: AsyncSession = Depends(get_db)):
+    """获取分类列表"""
+    from sqlalchemy import select
+    result = await db.execute(select(Category).where(Category.is_active == True).order_by(Category.order))
+    categories = result.scalars().all()
+    return categories
+
+
+@app.get("/api/products", response_model=List[ProductResponse])
+async def get_products(
+    category_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """获取产品列表（支持按分类过滤）"""
+    from sqlalchemy import select
+    query = select(Product).where(Product.is_active == True)
+    
+    if category_id:
+        query = query.where(Product.category_id == category_id)
+    
+    query = query.order_by(Product.id.desc())
+    result = await db.execute(query)
+    products = result.scalars().all()
+    return products
+
+
+@app.get("/api/products/{product_id}", response_model=ProductResponse)
+async def get_product(product_id: int, db: AsyncSession = Depends(get_db)):
+    """获取产品详情"""
+    from sqlalchemy import select
+    result = await db.execute(select(Product).where(Product.id == product_id))
+    product = result.scalar_one_or_none()
+    
+    if not product:
+        raise HTTPException(status_code=404, detail="产品不存在")
+    
+    return product
+
+
+# ==================== 启动时创建表 ====================
+@app.on_event("startup")
+async def startup():
+    """启动时创建数据库表"""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    print("✅ 数据库表已创建")
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    """关闭时清理"""
+    await engine.dispose()
+    print("✅ 数据库连接已关闭")
+

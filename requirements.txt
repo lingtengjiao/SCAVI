@@ -1,0 +1,14 @@
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+sqlalchemy[asyncio]==2.0.25
+aiomysql==0.2.0
+python-multipart==0.0.6
+python-dotenv==1.0.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+bcrypt==4.1.2
+httpx>=0.25.0  # 用于 OSS 文件代理
+# OSS 对象存储 SDK（根据需要选择安装）
+oss2>=2.18.0  # 阿里云 OSS
+# cos-python-sdk-v5>=1.9.24  # 腾讯云 COS（取消注释以使用）
+# boto3>=1.28.0  # AWS S3（取消注释以使用）
