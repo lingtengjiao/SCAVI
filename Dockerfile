@@ -4,12 +4,14 @@ FROM python:3.10-slim
 # 设置工作目录
 WORKDIR /app
 
-# 安装系统依赖（MySQL 客户端库、Poetry 等）
+# 安装系统依赖（MySQL 客户端库、Poetry、Node.js 等）
 RUN apt-get update && apt-get install -y \
     gcc \
     default-libmysqlclient-dev \
     pkg-config \
     curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 # 安装 Poetry（使用官方安装脚本）
@@ -32,9 +34,17 @@ RUN if [ ! -f poetry.lock ]; then \
 # 复制应用代码
 COPY . .
 
+# 安装前端依赖（如果 frontend 目录存在）
+RUN if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then \
+        echo "📦 安装前端依赖..." && \
+        cd frontend && \
+        npm install && \
+        cd ..; \
+    fi
+
 # 暴露端口
 EXPOSE 8000
 
-# 启动命令（使用 uvicorn 的 reload 模式支持热重载）
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# 使用启动脚本（支持前端热重载）
+CMD ["./start.sh"]
 

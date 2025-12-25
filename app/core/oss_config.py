@@ -5,8 +5,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# OSS 类型：aliyun, tencent, aws, qiniu 等
-OSS_TYPE = os.getenv("OSS_TYPE", "aliyun").lower()
+# OSS 类型：aliyun, tencent, aws, qiniu 等（为空则不使用 OSS）
+OSS_TYPE = os.getenv("OSS_TYPE", "").lower().strip()
 
 # 阿里云 OSS 配置
 ALIYUN_OSS_ACCESS_KEY_ID = os.getenv("ALIYUN_OSS_ACCESS_KEY_ID", "")
@@ -36,6 +36,10 @@ OSS_USE_HTTPS = os.getenv("OSS_USE_HTTPS", "true").lower() == "true"  # 是否�
 # 验证配置
 def validate_oss_config() -> tuple[bool, str]:
     """验证 OSS 配置是否完整"""
+    # 如果 OSS_TYPE 为空，表示不使用 OSS，直接返回 True
+    if not OSS_TYPE:
+        return True, ""
+    
     if OSS_TYPE == "aliyun":
         if not all([ALIYUN_OSS_ACCESS_KEY_ID, ALIYUN_OSS_ACCESS_KEY_SECRET, ALIYUN_OSS_ENDPOINT, ALIYUN_OSS_BUCKET_NAME]):
             return False, "阿里云 OSS 配置不完整，请检查环境变量"

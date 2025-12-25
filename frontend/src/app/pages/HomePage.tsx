@@ -80,7 +80,7 @@ export default function HomePage() {
         />
         <FactoryContact />
       </main>
-      <Footer onNavigate={handleNavigation} />
+      <Footer />
       <Toaster />
     </div>
   );

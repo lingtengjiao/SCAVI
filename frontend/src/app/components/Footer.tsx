@@ -33,3 +33,5 @@ export function Footer({ onNavigate }: FooterProps) {
     </footer>
   );
 }
+
+

@@ -165,10 +165,15 @@ else:
 # ==================== 启动事件 ====================
 @app.on_event("startup")
 async def startup():
-    """启动时创建数据库表"""
+    """启动时初始化数据库"""
+    # 创建数据库表
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     print("✅ 数据库表已创建")
+    
+    # 初始化默认管理员账户
+    from app.core.init_db import init_default_admin
+    await init_default_admin()
 
 
 @app.on_event("shutdown")
