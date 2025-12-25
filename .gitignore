@@ -9,7 +9,7 @@ venv/
 ENV/
 .venv
 
-# Django (旧项目，保留以防万一)
+# Django
 *.log
 db.sqlite3
 db.sqlite3-journal
@@ -32,7 +32,7 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Environment
+# Environment (一定要忽略 .env，非常重要！)
 .env.local
 .env.*.local
 .env
@@ -46,12 +46,12 @@ pnpm-debug.log*
 dist/
 build/
 
-# Static files (构建产物，可根据需要取消注释)
-# static/
-
-# 上传的文件（保留目录，但忽略文件内容）
+# Static files
 static/uploads/*
 !static/uploads/.gitkeep
-
-# Vite 构建时的临时备份目录
 .uploads_backup/
+
+# --- 👇 新增的重要部分 👇 ---
+# Docker & Database
+mysql-data/
+postgres-data/

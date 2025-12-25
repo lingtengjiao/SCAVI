@@ -5,9 +5,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 数据库配置
+# 优先从环境变量读取，Docker 环境中默认使用服务名 "db"
 DB_USER = os.getenv("DB_USER", "root")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "suantian51")
-DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
+DB_HOST = os.getenv("DB_HOST", "db")  # Docker 环境默认使用服务名，本地开发时通过环境变量覆盖
 DB_PORT = os.getenv("DB_PORT", "3306")
 DB_NAME = os.getenv("DB_NAME", "SCAVI")
 

@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "scavi-cms"
+version = "2.0.0"
+description = "B2B 产品展示系统 - 纯展示型 CMS"
+authors = ["SCAVI Team"]
+readme = "README.md"
+packages = [{include = "app"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+fastapi = "0.109.0"
+uvicorn = {extras = ["standard"], version = "0.27.0"}
+sqlalchemy = {extras = ["asyncio"], version = "2.0.25"}
+aiomysql = "0.2.0"
+python-multipart = "0.0.6"
+python-dotenv = "1.0.0"
+pydantic = "2.5.3"
+pydantic-settings = "2.1.0"
+bcrypt = "4.1.2"
+itsdangerous = ">=2.1.2"
+httpx = ">=0.25.0"
+oss2 = ">=2.18.0"
+
+[tool.poetry.group.dev.dependencies]
+# 开发依赖（可选）
+pytest = "^7.4.0"
+black = "^23.0.0"
+ruff = "^0.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+# 可以在这里定义命令行脚本（可选）
+

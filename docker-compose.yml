@@ -1,0 +1,50 @@
+services:
+  # Web 服务（FastAPI）
+  web:
+    build: .
+    container_name: scavi-web
+    ports:
+      - "8000:8000"
+    volumes:
+      # 挂载当前目录到容器，实现热重载
+      - .:/app
+    environment:
+      # 数据库连接配置（使用服务名 db 作为主机）
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=suantian51
+      - DB_NAME=SCAVI
+      # 其他配置
+      - SECRET_KEY=your-secret-key-change-this-in-production
+      - ADMIN_USERNAME=SCAVI
+      - ADMIN_PASSWORD=SCAVI123
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # MySQL 数据库服务
+  db:
+    image: mysql:8.0
+    container_name: scavi-mysql
+    platform: linux/amd64  # 针对 Mac M4 Pro (Apple Silicon) 的兼容性配置
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=suantian51
+      - MYSQL_DATABASE=SCAVI
+      - MYSQL_CHARACTER_SET_SERVER=utf8mb4
+      - MYSQL_COLLATION_SERVER=utf8mb4_unicode_ci
+    volumes:
+      # 数据持久化到本地 ./mysql-data 目录
+      - ./mysql-data:/var/lib/mysql
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-psuantian51"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
