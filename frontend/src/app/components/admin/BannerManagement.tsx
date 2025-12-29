@@ -35,6 +35,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { HeroSlide } from "../../types/admin";
 import { createHeroSlide, updateHeroSlide, deleteHeroSlide, uploadFile } from "../../services/adminApi";
 import { useData } from "../../context/DataContext";
+import { getImagePreviewUrl } from "../../utils/imageUtils";
 
 // Re-export for backward compatibility
 export type { HeroSlide };
@@ -85,7 +86,8 @@ export function BannerManagement({ banners, onUpdate }: BannerManagementProps) {
         textColor: banner.textColor || "white",
         status: statusValue
       });
-      setImagePreview(banner.image);
+      // 使用代理 URL 显示预览（如果是 OSS URL）
+      setImagePreview(banner.image ? getImagePreviewUrl(banner.image) : null);
     } else {
       setEditingBanner(null);
       setBannerForm({
@@ -136,12 +138,18 @@ export function BannerManagement({ banners, onUpdate }: BannerManagementProps) {
       const imageUrl = await uploadFile(file);
       console.log("[handleImageUpload] 上传成功，返回的URL:", imageUrl);
 
-      if (!imageUrl || !imageUrl.startsWith('/uploads/')) {
+      // 验证 URL：允许本地路径 (/uploads/) 或 OSS URL (http:// 或 https://)
+      if (!imageUrl || (!imageUrl.startsWith('/uploads/') && !imageUrl.startsWith('http://') && !imageUrl.startsWith('https://'))) {
         throw new Error('上传的图片URL无效');
       }
       
       // 更新表单中的图片 URL
       setBannerForm(prev => ({ ...prev, image: imageUrl }));
+      
+      // 如果上传成功，保持 base64 预览，或者使用代理 URL（如果是 OSS URL）
+      // imagePreview 已经是 base64，保持不变即可
+      // 如果后续需要显示实际 URL，可以使用 getImagePreviewUrl(imageUrl)
+      
       toast.dismiss();
       toast.success("图片上传成功");
       console.log("[handleImageUpload] 图片URL已设置:", imageUrl);
@@ -540,7 +548,7 @@ export function BannerManagement({ banners, onUpdate }: BannerManagementProps) {
               {/* Image Upload */}
               <div className="space-y-2">
                 <Label>Banner Image *</Label>
-                {!imagePreview ? (
+                {!imagePreview && !bannerForm.image ? (
                   <label className="border-2 border-dashed border-gray-300 rounded-lg p-8 flex flex-col items-center justify-center gap-3 hover:bg-gray-50 hover:border-gray-400 transition-all cursor-pointer text-center group">
                     <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center group-hover:bg-gray-200 transition-colors">
                       <Upload className="h-7 w-7 text-gray-400 group-hover:text-gray-600" />
@@ -560,9 +568,17 @@ export function BannerManagement({ banners, onUpdate }: BannerManagementProps) {
                 ) : (
                   <div className="relative rounded-lg overflow-hidden border-2 border-gray-200 bg-gray-100">
                     <img 
-                      src={imagePreview} 
+                      src={imagePreview || getImagePreviewUrl(bannerForm.image)} 
                       alt="Preview" 
                       className="w-full h-64 object-cover"
+                      onError={(e) => {
+                        console.error('图片加载失败:', imagePreview || bannerForm.image);
+                        // 如果代理失败，尝试直接使用原 URL
+                        const originalUrl = bannerForm.image;
+                        if (e.currentTarget.src.startsWith('/api/proxy/oss/') && originalUrl) {
+                          e.currentTarget.src = originalUrl;
+                        }
+                      }}
                     />
                     <button 
                       type="button"

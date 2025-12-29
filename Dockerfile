@@ -4,6 +4,10 @@ FROM python:3.10-slim
 # 设置工作目录
 WORKDIR /app
 
+# 更换 Debian 软件源为阿里云镜像（针对国内服务器加速）
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources || \
+    sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list || true
+
 # 安装系统依赖（MySQL 客户端库、Poetry、Node.js 等）
 RUN apt-get update && apt-get install -y \
     gcc \
