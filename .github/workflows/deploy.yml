@@ -14,19 +14,6 @@ jobs:
       - name: 检出代码
         uses: actions/checkout@v4
 
-      - name: 配置 Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package.json
-
-      - name: 安装前端依赖并构建
-        working-directory: frontend
-        run: |
-          npm install
-          npm run build
-
       - name: SSH 连接服务器并部署
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -42,12 +29,6 @@ jobs:
 
             echo "==> 拉取最新代码"
             git pull origin main
-
-            echo "==> 构建前端"
-            cd frontend
-            npm install
-            npm run build
-            cd ..
 
             echo "==> 更新 .env 文件（如需要）"
             # .env 文件应已预先在服务器配置好，不通过 git 管理

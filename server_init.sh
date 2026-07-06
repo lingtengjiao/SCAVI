@@ -66,22 +66,7 @@ else
     echo "✅ Git 已安装: $(git --version)"
 fi
 
-# 4. 安装 Node.js 20
-if ! command -v node &> /dev/null; then
-    echo "==> 安装 Node.js 20..."
-    if [ "$PKG_MANAGER" = "yum" ]; then
-        curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
-        yum install -y nodejs
-    else
-        curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
-        apt-get install -y nodejs
-    fi
-    echo "✅ Node.js 安装完成: $(node -v)"
-else
-    echo "✅ Node.js 已安装: $(node -v)"
-fi
-
-# 5. 克隆仓库
+# 4. 克隆仓库
 if [ ! -d "$DEPLOY_DIR/.git" ]; then
     echo "==> 克隆仓库到 $DEPLOY_DIR..."
     mkdir -p "$DEPLOY_DIR"
@@ -93,7 +78,7 @@ fi
 
 cd "$DEPLOY_DIR"
 
-# 6. 创建 .env 文件
+# 5. 创建 .env 文件
 if [ ! -f ".env" ]; then
     echo ""
     echo "==> 创建 .env 文件..."
@@ -118,17 +103,10 @@ else
     echo "✅ .env 文件已存在"
 fi
 
-# 7. 构建前端
-echo "==> 构建前端..."
-cd frontend
-npm install
-npm run build
-cd ..
-
-# 8. 创建 uploads 目录
+# 6. 创建 uploads 目录
 mkdir -p static/uploads
 
-# 9. 启动服务
+# 7. 启动服务
 echo "==> 启动 Docker 服务..."
 docker compose -f docker-compose.prod.yml up -d --build
 
@@ -136,7 +114,7 @@ echo ""
 echo "==> 等待服务启动（30秒）..."
 sleep 30
 
-# 10. 健康检查
+# 8. 健康检查
 echo "==> 健康检查..."
 docker compose -f docker-compose.prod.yml ps
 
