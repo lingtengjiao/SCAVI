@@ -94,10 +94,14 @@ if [ ! -f ".env" ]; then
     echo "  运行以下命令编辑："
     echo "    vi /opt/scavi/.env"
     echo ""
-    read -p "是否现在编辑 .env？(y/N) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        vi .env
+    if [ -t 0 ]; then
+        read -p "是否现在编辑 .env？(y/N) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            vi .env
+        fi
+    else
+        echo "  当前为非交互部署，跳过在线编辑 .env。"
     fi
 else
     echo "✅ .env 文件已存在"
