@@ -55,3 +55,6 @@ static/uploads/*
 # Docker & Database
 mysql-data/
 postgres-data/
+
+# 本地服务器信息（含密码，绝对不上传）
+.server-info.local
