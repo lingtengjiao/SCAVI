@@ -16,11 +16,20 @@ jobs:
 
       - name: SSH 连接服务器并部署
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          OSS_TYPE: ${{ vars.OSS_TYPE || 'aliyun' }}
+          OSS_PREFIX: ${{ vars.OSS_PREFIX || 'uploads' }}
+          OSS_USE_HTTPS: ${{ vars.OSS_USE_HTTPS || 'true' }}
+          ALIYUN_OSS_ACCESS_KEY_ID: ${{ secrets.ALIYUN_OSS_ACCESS_KEY_ID }}
+          ALIYUN_OSS_ACCESS_KEY_SECRET: ${{ secrets.ALIYUN_OSS_ACCESS_KEY_SECRET }}
+          ALIYUN_OSS_ENDPOINT: ${{ vars.ALIYUN_OSS_ENDPOINT }}
+          ALIYUN_OSS_BUCKET_NAME: ${{ vars.ALIYUN_OSS_BUCKET_NAME }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
+          envs: OSS_TYPE,OSS_PREFIX,OSS_USE_HTTPS,ALIYUN_OSS_ACCESS_KEY_ID,ALIYUN_OSS_ACCESS_KEY_SECRET,ALIYUN_OSS_ENDPOINT,ALIYUN_OSS_BUCKET_NAME
           script: |
             set -e
 
@@ -30,8 +39,46 @@ jobs:
             echo "==> 拉取最新代码"
             git pull origin main
 
-            echo "==> 更新 .env 文件（如需要）"
-            # .env 文件应已预先在服务器配置好，不通过 git 管理
+            echo "==> 同步 OSS 环境变量到 .env"
+            python3 - <<'PY'
+            import os
+            from pathlib import Path
+
+            path = Path(".env")
+            updates = {
+                key: os.environ[key]
+                for key in [
+                    "OSS_TYPE",
+                    "OSS_PREFIX",
+                    "OSS_USE_HTTPS",
+                    "ALIYUN_OSS_ACCESS_KEY_ID",
+                    "ALIYUN_OSS_ACCESS_KEY_SECRET",
+                    "ALIYUN_OSS_ENDPOINT",
+                    "ALIYUN_OSS_BUCKET_NAME",
+                ]
+                if os.environ.get(key)
+            }
+
+            if updates:
+                lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+                seen = set()
+                output = []
+                for line in lines:
+                    if "=" in line and not line.lstrip().startswith("#"):
+                        key = line.split("=", 1)[0].strip()
+                        if key in updates:
+                            output.append(f"{key}={updates[key]}")
+                            seen.add(key)
+                            continue
+                    output.append(line)
+
+                for key, value in updates.items():
+                    if key not in seen:
+                        output.append(f"{key}={value}")
+
+                path.write_text("\n".join(output) + "\n", encoding="utf-8")
+            PY
+            chmod 600 .env
 
             echo "==> 重新构建并启动容器"
             docker compose -f docker-compose.prod.yml up -d --build
