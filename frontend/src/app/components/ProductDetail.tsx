@@ -231,7 +231,7 @@ export function ProductDetail({ product, onBack }: ProductDetailProps) {
               {product.title}
             </h1>
             
-            <p className="text-gray-600 leading-relaxed mb-8 text-lg">
+            <p className="text-gray-600 leading-relaxed mb-8 text-lg whitespace-pre-line">
               {product.description}
             </p>
 
